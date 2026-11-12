@@ -154,12 +154,17 @@
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <script>
 const P = 'kotel';
+// Адресът на облачния сървър (не е тайна - входът е с потребител и парола)
+const DEFAULT_HOST = 'l821f467.ala.eu-central-1.emqxsl.com';
 const $ = (id) => document.getElementById(id);
 const st = {};
 let client = null;
 
 function load() {
-  try { return JSON.parse(localStorage.getItem('kotel_mqtt') || '{}'); } catch { return {}; }
+  let cfg = {};
+  try { cfg = JSON.parse(localStorage.getItem('kotel_mqtt') || '{}'); } catch {}
+  if (!cfg.host) cfg.host = DEFAULT_HOST;
+  return cfg;
 }
 function save(cfg) { try { localStorage.setItem('kotel_mqtt', JSON.stringify(cfg)); } catch {} }
 
@@ -170,7 +175,7 @@ function setConn(text, cls) {
 
 function connect() {
   const cfg = load();
-  if (!cfg.host || !cfg.user) { openSettings(); return; }
+  if (!cfg.user) { openSettings(); return; }
   if (client) client.end(true);
   setConn('Свързване…');
   client = mqtt.connect(`wss://${cfg.host}:8084/mqtt`, {
