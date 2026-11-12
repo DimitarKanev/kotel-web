@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101418">
+<title>Котел</title>
+<style>
+  :root {
+    --bg: #101418; --card: #1e252c; --text: #e8eaed; --muted: #8a939c;
+    --heat: #ff7a1a; --water: #2f9bff; --alert: #ff4d4d; --ok: #3ccf7a; --line: #2c343c;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #f3f5f7; --card: #ffffff; --text: #1a1f24; --muted: #66707a; --line: #dfe3e8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: max(16px, env(safe-area-inset-top)) 16px 32px;
+  }
+  main { max-width: 520px; margin: 0 auto; display: grid; gap: 14px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  h1 { font-size: 22px; margin: 0; }
+  .status { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--alert); }
+  .card { background: var(--card); border-radius: 16px; padding: 16px; border: 2px solid transparent; }
+  .card.active-heat { border-color: var(--heat); } .card.active-water { border-color: var(--water); }
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .big { font-size: 56px; font-weight: 600; line-height: 1; }
+  .label { color: var(--muted); font-size: 14px; }
+  .target { color: var(--heat); font-size: 20px; font-weight: 600; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .kv { display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; font-size: 15px; }
+  .kv span:nth-child(odd) { color: var(--muted); }
+  button {
+    font: inherit; color: var(--text); background: var(--line); border: 0; border-radius: 12px;
+    padding: 12px 16px; min-height: 48px; cursor: pointer;
+  }
+  button.round { width: 56px; height: 56px; border-radius: 50%; font-size: 28px; padding: 0; }
+  button.on-heat { background: var(--heat); color: #fff; }
+  button.on-water { background: var(--water); color: #fff; }
+  button:disabled { opacity: .5; }
+  .stepper { display: flex; align-items: center; gap: 14px; }
+  .bar { height: 12px; background: var(--line); border-radius: 6px; overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: var(--heat); transition: width .4s; }
+  select, input {
+    font: inherit; width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text);
+  }
+  dialog { border: 0; border-radius: 16px; background: var(--card); color: var(--text); width: min(92vw, 420px); }
+  dialog::backdrop { background: rgba(0,0,0,.5); }
+  .fault { color: var(--alert); font-weight: 600; }
+  .hidden { display: none !important; }
+  .note { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Котел</h1>
+    <div class="status"><span id="dot" class="dot"></span><span id="conn">Не е свързано</span>
+      <button id="btnSettings" aria-label="Настройки">⚙</button></div>
+  </header>
+
+  <section class="card" id="cardRoom">
+    <div class="row">
+      <div>
+        <div class="label">В стаята</div>
+        <div class="big" id="room">--</div>
+        <div class="label" id="humidity">влажност --%</div>
+      </div>
+      <div style="text-align:right">
+        <div class="label">Навън</div>
+        <div style="font-size:32px;font-weight:600" id="outside">--</div>
+        <div class="label" id="boilerState">--</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="cardHeat">
+    <div class="row">
+      <div>
+        <div class="label">Отопление</div>
+        <div class="target" id="target">Цел --</div>
+      </div>
+      <div class="stepper">
+        <button class="round" data-step="-0.5" aria-label="По-студено">−</button>
+        <button class="round" data-step="0.5" aria-label="По-топло">+</button>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="btnHeat">Отопление</button>
+      <div class="label" id="flow">Вода -- / --°</div>
+    </div>
+  </section>
+
+  <section class="card" id="cardDhw">
+    <div class="row">
+      <div>
+        <div class="label">Топла вода</div>
+        <div style="font-size:20px;font-weight:600" id="dhw">-- / --°</div>
+      </div>
+      <div class="stepper">
+        <button class="round" data-dhw="-1" aria-label="По-студена вода">−</button>
+        <button class="round" data-dhw="1" aria-label="По-топла вода">+</button>
+      </div>
+    </div>
+    <div style="margin-top:12px"><button id="btnDhw">Топла вода</button></div>
+  </section>
+
+  <section class="card">
+    <div class="row"><span class="label">Мощност</span><span id="power">--%</span></div>
+    <div class="bar" style="margin-top:8px"><div id="powerBar"></div></div>
+  </section>
+
+  <section class="card grid2">
+    <label><span class="label">Регулиране</span>
+      <select id="selReg"><option>Стаен термостат</option><option>Фиксирана</option><option>Крива</option></select>
+    </label>
+    <label><span class="label">График</span>
+      <select id="selSched"><option>Изкл</option><option>Дневен</option><option>Седмичен</option></select>
+    </label>
+  </section>
+
+  <section class="card">
+    <div class="kv">
+      <span>Подаваща вода</span><span id="kvFlow">--</span>
+      <span>Връщаща вода</span><span id="kvRet">--</span>
+      <span>Налягане</span><span id="kvPress">--</span>
+      <span>Връзка с котела</span><span id="kvLink">--</span>
+      <span>Авария</span><span id="kvFault">--</span>
+    </div>
+  </section>
+
+  <p class="note">Промените тук се виждат веднага и на дисплея, и в Home Assistant.</p>
+</main>
+
+<dialog id="dlg">
+  <form method="dialog" style="display:grid;gap:12px">
+    <h2 style="margin:0;font-size:20px">Връзка с облачния сървър (EMQX)</h2>
+    <label><span class="label">Адрес на сървъра</span>
+      <input id="host" placeholder="xxxxxxxx.ala.eu-central-1.emqxsl.com" autocomplete="off"></label>
+    <label><span class="label">Потребител</span><input id="user" autocomplete="username"></label>
+    <label><span class="label">Парола</span><input id="pass" type="password" autocomplete="current-password"></label>
+    <p class="note">Данните се пазят само в този браузър.</p>
+    <div class="row"><button value="cancel">Отказ</button><button id="btnSave" value="ok" class="on-heat">Свържи</button></div>
+  </form>
+</dialog>
+
+<script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script>
+const P = 'kotel';
+const $ = (id) => document.getElementById(id);
+const st = {};
+let client = null;
+
+function load() {
+  try { return JSON.parse(localStorage.getItem('kotel_mqtt') || '{}'); } catch { return {}; }
+}
+function save(cfg) { try { localStorage.setItem('kotel_mqtt', JSON.stringify(cfg)); } catch {} }
+
+function setConn(text, cls) {
+  $('conn').textContent = text;
+  $('dot').className = 'dot ' + (cls || '');
+}
+
+function connect() {
+  const cfg = load();
+  if (!cfg.host || !cfg.user) { openSettings(); return; }
+  if (client) client.end(true);
+  setConn('Свързване…');
+  client = mqtt.connect(`wss://${cfg.host}:8084/mqtt`, {
+    username: cfg.user, password: cfg.pass,
+    clientId: 'kotel-web-' + Math.random().toString(16).slice(2, 10),
+    reconnectPeriod: 5000, connectTimeout: 15000,
+  });
+  // Само два абонамента (EMQX Serverless позволява до 10 на клиент)
+  client.on('connect', () => { setConn('Свързано', 'ok'); client.subscribe([P + '/state', P + '/status']); });
+  client.on('reconnect', () => setConn('Свързване…'));
+  client.on('close', () => setConn('Няма връзка', 'bad'));
+  client.on('error', (e) => setConn('Грешка: ' + (e && e.message || e), 'bad'));
+  client.on('message', (topic, msg) => {
+    if (topic === P + '/status') { st.status = msg.toString(); }
+    else { try { Object.assign(st, JSON.parse(msg.toString())); } catch (e) { return; } }
+    render();
+  });
+}
+
+// Команда към дисплея: едно JSON съобщение в kotel/cmd
+function cmd(obj) {
+  if (client && client.connected) client.publish(`${P}/cmd`, JSON.stringify(obj));
+}
+
+const num = (k) => (typeof st[k] === 'number' ? st[k] : null);
+const f1 = (v, u = '°') => v === null ? '--' : v.toFixed(1) + u;
+const f0 = (v, u = '') => v === null ? '--' : Math.round(v) + u;
+
+function render() {
+  if (st.status === 'offline') setConn('Дисплеят е офлайн', 'bad');
+  else if (client && client.connected) setConn('Свързано', 'ok');
+
+  $('room').textContent = f1(num('room'));
+  const h = num('hum');
+  $('humidity').textContent = 'влажност ' + (h === null ? '--' : Math.round(h)) + '%';
+  const out = num('out');
+  $('outside').textContent = out === null ? 'няма' : f1(out);
+
+  const chOn = st.ch === true, dhwOn = st.dhw_act === true, fault = st.fault === true;
+  $('boilerState').textContent = st.link === false ? 'Няма връзка с котела' : fault ? 'Авария'
+    : chOn && dhwOn ? 'Отопление + БГВ' : dhwOn ? 'Топла вода' : chOn ? 'Отопление' : 'В покой';
+  $('boilerState').className = fault ? 'fault' : 'label';
+
+  $('target').textContent = 'Цел ' + f1(num('target'));
+  $('btnHeat').textContent = st.mode === 'off' ? 'Отопление: изкл' : 'Отопление: вкл';
+  $('btnHeat').className = st.mode === 'heat' ? 'on-heat' : '';
+  const req = num('flow_req');
+  $('flow').textContent = `Вода ${f0(num('flow'))} / ${req && req > 0 ? f0(req) : '--'}°`;
+  $('cardHeat').classList.toggle('active-heat', chOn);
+
+  $('btnDhw').textContent = st.dhw_on ? 'Топла вода: вкл' : 'Топла вода: изкл';
+  $('btnDhw').className = st.dhw_on ? 'on-water' : '';
+  $('dhw').textContent = `${f0(num('dhw_t'))} / ${f0(num('dhw_set'))}°`;
+  $('cardDhw').classList.toggle('active-water', dhwOn);
+
+  const p = num('power'), kw = num('kw');
+  $('power').textContent = (p === null ? '--%' : Math.round(p) + '%') + (kw === null ? '' : `  ${kw.toFixed(1)} kW`);
+  $('powerBar').style.width = (p || 0) + '%';
+
+  if (st.reg && document.activeElement !== $('selReg')) $('selReg').value = st.reg;
+  if (st.sched && document.activeElement !== $('selSched')) $('selSched').value = st.sched;
+
+  $('kvFlow').textContent = f1(num('flow'));
+  $('kvRet').textContent = f1(num('ret'));
+  $('kvPress').textContent = f1(num('press'), ' bar');
+  $('kvLink').textContent = st.link ? 'да' : 'няма';
+  const code = num('fault_code');
+  $('kvFault').textContent = fault ? 'да' + (code !== null ? ` (E${Math.round(code)})` : '') : 'няма';
+  $('kvFault').className = fault ? 'fault' : '';
+}
+
+document.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => {
+  const t = num('target');
+  if (t === null) return;
+  const v = Math.min(28, Math.max(10, t + parseFloat(b.dataset.step)));
+  st.target = v; render();
+  cmd({ target: v });
+}));
+document.querySelectorAll('[data-dhw]').forEach((b) => b.addEventListener('click', () => {
+  const t = num('dhw_set');
+  if (t === null) return;
+  const v = Math.min(60, Math.max(35, t + parseInt(b.dataset.dhw, 10)));
+  st.dhw_set = v; render();
+  cmd({ dhw_set: v });
+}));
+// Бутоните се сменят веднага; дисплеят потвърждава до около секунда
+$('btnHeat').addEventListener('click', () => {
+  st.mode = st.mode === 'off' ? 'heat' : 'off'; render(); cmd({ mode: st.mode });
+});
+$('btnDhw').addEventListener('click', () => {
+  st.dhw_on = !st.dhw_on; render(); cmd({ dhw_on: st.dhw_on });
+});
+$('selReg').addEventListener('change', (e) => { st.reg = e.target.value; cmd({ reg: st.reg }); e.target.blur(); });
+$('selSched').addEventListener('change', (e) => { st.sched = e.target.value; cmd({ sched: st.sched }); e.target.blur(); });
+
+function openSettings() {
+  const cfg = load();
+  $('host').value = cfg.host || ''; $('user').value = cfg.user || ''; $('pass').value = cfg.pass || '';
+  $('dlg').showModal();
+}
+$('btnSettings').addEventListener('click', openSettings);
+$('dlg').addEventListener('close', () => {
+  if ($('dlg').returnValue !== 'ok') return;
+  save({ host: $('host').value.trim(), user: $('user').value.trim(), pass: $('pass').value });
+  connect();
+});
+
+connect();
+</script>
+</body>
+</html>
