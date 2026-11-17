@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#101418">
 <title>Котел</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
   :root {
     --bg: #101418; --card: #1e252c; --text: #e8eaed; --muted: #8a939c;
@@ -56,15 +58,52 @@
   .fault { color: var(--alert); font-weight: 600; }
   .hidden { display: none !important; }
   .note { font-size: 13px; color: var(--muted); }
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tabs button.on { background: var(--heat); color: #fff; }
+  form.stack, .stack { display: grid; gap: 12px; }
+  .err { color: var(--alert); font-size: 14px; min-height: 1.2em; }
+  .menu { display: grid; gap: 10px; }
+  .menu button { text-align: left; }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>Котел</h1>
-    <div class="status"><span id="dot" class="dot"></span><span id="conn">Не е свързано</span>
-      <button id="btnSettings" aria-label="Настройки">⚙</button></div>
+    <div class="status"><span id="dot" class="dot"></span><span id="conn"></span>
+      <button id="btnMenu" aria-label="Меню" class="hidden">☰</button></div>
   </header>
+
+  <!-- Вход / регистрация -->
+  <section class="card stack hidden" id="viewAuth">
+    <div class="tabs"><button id="tabLogin" class="on">Вход</button><button id="tabReg">Регистрация</button></div>
+    <form class="stack" id="formAuth">
+      <label><span class="label">Имейл</span><input id="email" type="email" autocomplete="username" required></label>
+      <label><span class="label">Парола (поне 8 знака)</span><input id="password" type="password" autocomplete="current-password" minlength="8" required></label>
+      <div class="err" id="authErr"></div>
+      <button class="on-heat" id="btnAuth" type="submit">Вход</button>
+    </form>
+    <p class="note" id="authNote">Нямате акаунт? Изберете „Регистрация“.</p>
+  </section>
+
+  <!-- Добавяне на термостат -->
+  <section class="card stack hidden" id="viewPair">
+    <div style="font-size:18px;font-weight:600">Добавяне на термостат</div>
+    <p class="note" style="margin:0">Най-лесно: на дисплея отворете Детайли → Сервиз → „QR за телефон“ и сканирайте
+      кода с камерата. Или въведете номера и кода, изписани под QR кода.</p>
+    <form class="stack" id="formPair">
+      <label><span class="label">Номер</span><input id="pairDev" autocomplete="off" maxlength="8" placeholder="напр. 1a2b3c4d" required></label>
+      <label><span class="label">Код</span><input id="pairCode" autocomplete="off" maxlength="8" style="text-transform:uppercase" required></label>
+      <div class="err" id="pairErr"></div>
+      <button class="on-heat" type="submit">Добави</button>
+    </form>
+    <button id="btnPairCancel" class="hidden">Назад</button>
+  </section>
+
+  <div id="viewMain" class="stack hidden">
+  <section class="card hidden" id="cardDevSel">
+    <label><span class="label">Термостат</span><select id="selDev"></select></label>
+  </section>
 
   <section class="card" id="cardRoom">
     <div class="row">
@@ -137,67 +176,188 @@
   </section>
 
   <p class="note">Промените тук се виждат веднага и на дисплея, и в Home Assistant.</p>
+  </div>
 </main>
 
-<dialog id="dlg">
-  <form method="dialog" style="display:grid;gap:12px">
-    <h2 style="margin:0;font-size:20px">Връзка с облачния сървър (EMQX)</h2>
-    <label><span class="label">Адрес на сървъра</span>
-      <input id="host" placeholder="xxxxxxxx.ala.eu-central-1.emqxsl.com" autocomplete="off"></label>
-    <label><span class="label">Потребител</span><input id="user" autocomplete="username"></label>
-    <label><span class="label">Парола</span><input id="pass" type="password" autocomplete="current-password"></label>
-    <p class="note">Данните се пазят само в този браузър.</p>
-    <div class="row"><button value="cancel">Отказ</button><button id="btnSave" value="ok" class="on-heat">Свържи</button></div>
-  </form>
+<dialog id="dlgMenu">
+  <div class="menu">
+    <div class="label" id="menuWho"></div>
+    <button id="mAdd">➕ Добави термостат</button>
+    <button id="mRemove">➖ Махни този термостат от акаунта</button>
+    <button id="mLogout">↩ Изход</button>
+    <button id="mClose">Затвори</button>
+  </div>
 </dialog>
 
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
 <script>
-const P = 'kotel';
-// Адресът на облачния сървър (не е тайна - входът е с потребител и парола)
-const DEFAULT_HOST = 'l821f467.ala.eu-central-1.emqxsl.com';
+// Облачната услуга (акаунти и сдвояване) - cloud/src/index.js
+const API = 'https://kotel-cloud.dimitarkanev55.workers.dev';
 const $ = (id) => document.getElementById(id);
-const st = {};
+let st = {};
 let client = null;
+let me = null;          // { email, devices: [...], mqtt: {host, port, user, pass} }
+let dev = null;         // текущ термостат (номер)
+let regMode = false;
 
-function load() {
-  let cfg = {};
-  try { cfg = JSON.parse(localStorage.getItem('kotel_mqtt') || '{}'); } catch {}
-  if (!cfg.host) cfg.host = DEFAULT_HOST;
-  return cfg;
+// ---------- локално пазене (само в този браузър) ----------
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch {} },
+};
+
+async function api(path, body) {
+  const h = { 'Content-Type': 'application/json' };
+  const tok = store.get('kotel_token');
+  if (tok) h.Authorization = 'Bearer ' + tok;
+  let r;
+  try {
+    r = await fetch(API + path, { method: body === undefined ? 'GET' : 'POST', headers: h,
+      body: body === undefined ? undefined : JSON.stringify(body) });
+  } catch { throw new Error('Няма връзка с интернет'); }
+  const d = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== '/api/login') store.set('kotel_token', null);
+  if (!r.ok) { const e = new Error(d.error || 'Грешка ' + r.status); e.status = r.status; throw e; }
+  return d;
 }
-function save(cfg) { try { localStorage.setItem('kotel_mqtt', JSON.stringify(cfg)); } catch {} }
 
-function setConn(text, cls) {
-  $('conn').textContent = text;
-  $('dot').className = 'dot ' + (cls || '');
+function show(view) {
+  for (const v of ['viewAuth', 'viewPair', 'viewMain']) $(v).classList.toggle('hidden', v !== view);
+  $('btnMenu').classList.toggle('hidden', view === 'viewAuth');
+}
+function setConn(text, cls) { $('conn').textContent = text; $('dot').className = 'dot ' + (cls || ''); }
+
+// ---------- QR от дисплея: ?d=<номер>&c=<код> ----------
+const qs = new URLSearchParams(location.search);
+let pending = qs.get('d') && qs.get('c') ? { device: qs.get('d'), code: qs.get('c') } : null;
+if (pending) history.replaceState(null, '', location.pathname);
+
+// ---------- вход / регистрация ----------
+function setRegMode(on) {
+  regMode = on;
+  $('tabLogin').classList.toggle('on', !on);
+  $('tabReg').classList.toggle('on', on);
+  $('btnAuth').textContent = on ? 'Регистрация' : 'Вход';
+  $('password').autocomplete = on ? 'new-password' : 'current-password';
+  $('authNote').textContent = on ? 'Вече имате акаунт? Изберете „Вход“.' : 'Нямате акаунт? Изберете „Регистрация“.';
+  $('authErr').textContent = '';
+}
+$('tabLogin').onclick = () => setRegMode(false);
+$('tabReg').onclick = () => setRegMode(true);
+$('formAuth').onsubmit = async (e) => {
+  e.preventDefault();
+  $('authErr').textContent = '';
+  $('btnAuth').disabled = true;
+  try {
+    const d = await api(regMode ? '/api/register' : '/api/login',
+      { email: $('email').value, password: $('password').value });
+    store.set('kotel_token', d.token);
+    $('password').value = '';
+    await afterLogin(d.me);
+  } catch (err) { $('authErr').textContent = err.message; }
+  $('btnAuth').disabled = false;
+};
+
+async function afterLogin(m) {
+  me = m;
+  $('menuWho').textContent = me.email;
+  if (pending) {
+    try { me = await api('/api/pair', pending); dev = pending.device; }
+    catch (err) { $('pairErr').textContent = err.message; }
+    pending = null;
+  }
+  if (!me.devices.length) { openPair(false); return; }
+  if (!dev || !me.devices.includes(dev)) dev = store.get('kotel_dev');
+  if (!me.devices.includes(dev)) dev = me.devices[0];
+  startDevice();
 }
 
+// ---------- сдвояване ----------
+function openPair(canCancel) {
+  $('btnPairCancel').classList.toggle('hidden', !canCancel);
+  show('viewPair');
+}
+$('btnPairCancel').onclick = () => show('viewMain');
+$('formPair').onsubmit = async (e) => {
+  e.preventDefault();
+  $('pairErr').textContent = '';
+  const d = $('pairDev').value.trim().toLowerCase();
+  try {
+    me = await api('/api/pair', { device: d, code: $('pairCode').value.trim() });
+    dev = d;
+    $('pairDev').value = '';
+    $('pairCode').value = '';
+    startDevice();
+  } catch (err) { $('pairErr').textContent = err.message; }
+};
+
+// ---------- меню ----------
+$('btnMenu').onclick = () => $('dlgMenu').showModal();
+$('mClose').onclick = () => $('dlgMenu').close();
+$('mAdd').onclick = () => { $('dlgMenu').close(); openPair(true); };
+$('mRemove').onclick = async () => {
+  $('dlgMenu').close();
+  if (!dev || !confirm('Да махна ли този термостат от вашия акаунт? Самият термостат продължава да работи.')) return;
+  try { me = await api('/api/unpair', { device: dev }); dev = null; afterLogin(me); } catch (err) { alert(err.message); }
+};
+$('mLogout').onclick = async () => {
+  $('dlgMenu').close();
+  try { await api('/api/logout', {}); } catch {}
+  store.set('kotel_token', null);
+  if (client) client.end(true);
+  client = null; me = null; dev = null; st = {};
+  setConn('');
+  show('viewAuth');
+};
+
+// ---------- избор на термостат и MQTT ----------
+$('selDev').onchange = (e) => { dev = e.target.value; startDevice(); };
+
+function startDevice() {
+  store.set('kotel_dev', dev);
+  const sel = $('selDev');
+  sel.innerHTML = '';
+  me.devices.forEach((d, i) => {
+    const o = document.createElement('option');
+    o.value = d;
+    o.textContent = 'Термостат ' + (i + 1) + ' (' + d + ')';
+    sel.appendChild(o);
+  });
+  sel.value = dev;
+  $('cardDevSel').classList.toggle('hidden', me.devices.length < 2);
+  show('viewMain');
+  st = {};
+  render();
+  connect();
+}
+
+const T = (x) => `k/${dev}/${x}`;
 function connect() {
-  const cfg = load();
-  if (!cfg.user) { openSettings(); return; }
   if (client) client.end(true);
   setConn('Свързване…');
-  client = mqtt.connect(`wss://${cfg.host}:8084/mqtt`, {
-    username: cfg.user, password: cfg.pass,
+  const m = me.mqtt;
+  const my = mqtt.connect(`wss://${m.host}:${m.port}/mqtt`, {
+    username: m.user, password: m.pass,
     clientId: 'kotel-web-' + Math.random().toString(16).slice(2, 10),
-    reconnectPeriod: 5000, connectTimeout: 15000,
+    reconnectPeriod: 5000, connectTimeout: 15000, clean: true,
   });
+  client = my;
   // Само два абонамента (EMQX Serverless позволява до 10 на клиент)
-  client.on('connect', () => { setConn('Свързано', 'ok'); client.subscribe([P + '/state', P + '/status']); });
-  client.on('reconnect', () => setConn('Свързване…'));
-  client.on('close', () => setConn('Няма връзка', 'bad'));
-  client.on('error', (e) => setConn('Грешка: ' + (e && e.message || e), 'bad'));
-  client.on('message', (topic, msg) => {
-    if (topic === P + '/status') { st.status = msg.toString(); }
-    else { try { Object.assign(st, JSON.parse(msg.toString())); } catch (e) { return; } }
+  my.on('connect', () => { setConn('Свързано', 'ok'); my.subscribe([T('state'), T('status')]); });
+  my.on('reconnect', () => { if (my === client) setConn('Свързване…'); });
+  my.on('close', () => { if (my === client) setConn('Няма връзка', 'bad'); });
+  my.on('error', (e) => { if (my === client) setConn('Грешка: ' + (e && e.message || e), 'bad'); });
+  my.on('message', (topic, msg) => {
+    if (my !== client) return;
+    if (topic === T('status')) st.status = msg.toString();
+    else { try { Object.assign(st, JSON.parse(msg.toString())); } catch { return; } }
     render();
   });
 }
 
-// Команда към дисплея: едно JSON съобщение в kotel/cmd
+// Команда към дисплея: едно JSON съобщение в k/<номер>/cmd
 function cmd(obj) {
-  if (client && client.connected) client.publish(`${P}/cmd`, JSON.stringify(obj));
+  if (client && client.connected) client.publish(T('cmd'), JSON.stringify(obj));
 }
 
 const num = (k) => (typeof st[k] === 'number' ? st[k] : null);
@@ -205,7 +365,7 @@ const f1 = (v, u = '°') => v === null ? '--' : v.toFixed(1) + u;
 const f0 = (v, u = '') => v === null ? '--' : Math.round(v) + u;
 
 function render() {
-  if (st.status === 'offline') setConn('Дисплеят е офлайн', 'bad');
+  if (st.status === 'offline') setConn('Термостатът е офлайн', 'bad');
   else if (client && client.connected) setConn('Свързано', 'ok');
 
   $('room').textContent = f1(num('room'));
@@ -262,28 +422,17 @@ document.querySelectorAll('[data-dhw]').forEach((b) => b.addEventListener('click
   cmd({ dhw_set: v });
 }));
 // Бутоните се сменят веднага; дисплеят потвърждава до около секунда
-$('btnHeat').addEventListener('click', () => {
-  st.mode = st.mode === 'off' ? 'heat' : 'off'; render(); cmd({ mode: st.mode });
-});
-$('btnDhw').addEventListener('click', () => {
-  st.dhw_on = !st.dhw_on; render(); cmd({ dhw_on: st.dhw_on });
-});
+$('btnHeat').addEventListener('click', () => { st.mode = st.mode === 'off' ? 'heat' : 'off'; render(); cmd({ mode: st.mode }); });
+$('btnDhw').addEventListener('click', () => { st.dhw_on = !st.dhw_on; render(); cmd({ dhw_on: st.dhw_on }); });
 $('selReg').addEventListener('change', (e) => { st.reg = e.target.value; cmd({ reg: st.reg }); e.target.blur(); });
 $('selSched').addEventListener('change', (e) => { st.sched = e.target.value; cmd({ sched: st.sched }); e.target.blur(); });
 
-function openSettings() {
-  const cfg = load();
-  $('host').value = cfg.host || ''; $('user').value = cfg.user || ''; $('pass').value = cfg.pass || '';
-  $('dlg').showModal();
-}
-$('btnSettings').addEventListener('click', openSettings);
-$('dlg').addEventListener('close', () => {
-  if ($('dlg').returnValue !== 'ok') return;
-  save({ host: $('host').value.trim(), user: $('user').value.trim(), pass: $('pass').value });
-  connect();
-});
-
-connect();
+// ---------- старт ----------
+(async () => {
+  if (!store.get('kotel_token')) { show('viewAuth'); if (pending) setRegMode(true); return; }
+  try { await afterLogin(await api('/api/me')); }
+  catch (err) { show('viewAuth'); if (err.status !== 401) $('authErr').textContent = err.message; }
+})();
 </script>
 </body>
 </html>
