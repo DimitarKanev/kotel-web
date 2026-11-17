@@ -136,6 +136,7 @@
     </div>
     <div class="row" style="margin-top:12px">
       <button id="btnHeat">Отопление</button>
+      <button id="btnSummer">Летен режим</button>
       <div class="label" id="flow">Вода -- / --°</div>
     </div>
   </section>
@@ -415,6 +416,8 @@ function render() {
 
   $('target').textContent = 'Цел ' + f1(num('target'));
   $('btnHeat').textContent = st.mode === 'off' ? 'Отопление: изкл' : 'Отопление: вкл';
+  $('btnSummer').textContent = st.summer ? 'Летен режим: вкл' : 'Летен режим';
+  $('btnSummer').className = st.summer ? 'on-water' : '';
   $('btnHeat').className = st.mode === 'heat' ? 'on-heat' : '';
   const req = num('flow_req');
   $('flow').textContent = `Вода ${f0(num('flow'))} / ${req && req > 0 ? f0(req) : '--'}°`;
@@ -462,6 +465,10 @@ document.querySelectorAll('[data-dhw]').forEach((b) => b.addEventListener('click
 }));
 // Бутоните се сменят веднага; дисплеят потвърждава до около секунда
 $('btnHeat').addEventListener('click', () => { st.mode = st.mode === 'off' ? 'heat' : 'off'; render(); cmd({ mode: st.mode }); });
+$('btnSummer').addEventListener('click', () => {
+  if (!st.summer && !confirm('Летен режим: отоплението спира, работи само топлата вода. Включване?')) return;
+  st.summer = !st.summer; render(); cmd({ summer: st.summer });
+});
 $('btnDhw').addEventListener('click', () => { st.dhw_on = !st.dhw_on; render(); cmd({ dhw_on: st.dhw_on }); });
 $('selReg').addEventListener('change', (e) => { st.reg = e.target.value; cmd({ reg: st.reg }); e.target.blur(); });
 $('selSched').addEventListener('change', (e) => { st.sched = e.target.value; cmd({ sched: st.sched }); e.target.blur(); });
