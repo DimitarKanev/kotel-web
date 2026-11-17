@@ -64,6 +64,9 @@
   .err { color: var(--alert); font-size: 14px; min-height: 1.2em; }
   .menu { display: grid; gap: 10px; }
   .menu button { text-align: left; }
+  .srow { display: grid; grid-template-columns: 1fr 1fr 48px; gap: 8px; align-items: center; }
+  .srow button { min-height: 44px; padding: 0; }
+  details summary { cursor: pointer; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -166,6 +169,29 @@
   </section>
 
   <section class="card">
+    <details id="schedBox">
+      <summary>Редактор на графика</summary>
+      <div class="stack" style="margin-top:12px">
+        <label><span class="label">Ден</span>
+          <select id="schedDay">
+            <option value="0">Всеки ден (режим Дневен)</option>
+            <option value="1">Понеделник</option><option value="2">Вторник</option>
+            <option value="3">Сряда</option><option value="4">Четвъртък</option>
+            <option value="5">Петък</option><option value="6">Събота</option>
+            <option value="7">Неделя</option>
+          </select></label>
+        <div class="label">От час · температура</div>
+        <div id="schedRows" class="stack"></div>
+        <div class="row">
+          <button id="schedAdd">+ Добави период</button>
+          <button id="schedSave" class="on-heat">Запази</button>
+        </div>
+        <div class="note" id="schedMsg"></div>
+      </div>
+    </details>
+  </section>
+
+  <section class="card">
     <div class="kv">
       <span>Подаваща вода</span><span id="kvFlow">--</span>
       <span>Връщаща вода</span><span id="kvRet">--</span>
@@ -175,7 +201,7 @@
     </div>
   </section>
 
-  <p class="note">Промените тук се виждат веднага и на дисплея, и в Home Assistant.</p>
+  <p class="note"><span id="lastChange"></span><br>Промените тук се виждат веднага и на дисплея, и в Home Assistant.</p>
   </div>
 </main>
 
@@ -327,6 +353,7 @@ function startDevice() {
   $('cardDevSel').classList.toggle('hidden', me.devices.length < 2);
   show('viewMain');
   st = {};
+  sched = null; schedDirty = false; loadSchedDay();
   render();
   connect();
 }
@@ -343,13 +370,18 @@ function connect() {
   });
   client = my;
   // Само два абонамента (EMQX Serverless позволява до 10 на клиент)
-  my.on('connect', () => { setConn('Свързано', 'ok'); my.subscribe([T('state'), T('status')]); });
+  my.on('connect', () => { setConn('Свързано', 'ok'); my.subscribe([T('state'), T('status'), T('sched')]); });
   my.on('reconnect', () => { if (my === client) setConn('Свързване…'); });
   my.on('close', () => { if (my === client) setConn('Няма връзка', 'bad'); });
   my.on('error', (e) => { if (my === client) setConn('Грешка: ' + (e && e.message || e), 'bad'); });
   my.on('message', (topic, msg) => {
     if (my !== client) return;
     if (topic === T('status')) st.status = msg.toString();
+    else if (topic === T('sched')) {
+      try { sched = JSON.parse(msg.toString()).days || null; } catch { return; }
+      if (!schedDirty) loadSchedDay();
+      return;
+    }
     else { try { Object.assign(st, JSON.parse(msg.toString())); } catch { return; } }
     render();
   });
@@ -398,6 +430,7 @@ function render() {
   if (st.reg && document.activeElement !== $('selReg')) $('selReg').value = st.reg;
   if (st.sched && document.activeElement !== $('selSched')) $('selSched').value = st.sched;
 
+  $('lastChange').textContent = st.last ? 'Последна промяна: ' + st.last : '';
   $('kvFlow').textContent = f1(num('flow'));
   $('kvRet').textContent = f1(num('ret'));
   $('kvPress').textContent = f1(num('press'), ' bar');
@@ -426,6 +459,67 @@ $('btnHeat').addEventListener('click', () => { st.mode = st.mode === 'off' ? 'he
 $('btnDhw').addEventListener('click', () => { st.dhw_on = !st.dhw_on; render(); cmd({ dhw_on: st.dhw_on }); });
 $('selReg').addEventListener('change', (e) => { st.reg = e.target.value; cmd({ reg: st.reg }); e.target.blur(); });
 $('selSched').addEventListener('change', (e) => { st.sched = e.target.value; cmd({ sched: st.sched }); e.target.blur(); });
+
+// ---------- редактор на графика ----------
+let sched = null;        // 8 реда текст: [всеки ден, пн..нд]
+let schedDirty = false;
+const pad = (n) => String(n).padStart(2, '0');
+
+function parseDay(txt) {
+  const out = [];
+  for (const part of String(txt || '').replace(/;/g, ',').split(',')) {
+    const m = part.trim().match(/^(\d{1,2}):(\d{2})\s+(-?\d+(?:\.\d+)?)$/);
+    if (m) out.push({ t: `${pad(+m[1])}:${m[2]}`, v: parseFloat(m[3]) });
+  }
+  return out.sort((a, b) => a.t.localeCompare(b.t));
+}
+
+function addRow(t, v) {
+  const row = document.createElement('div');
+  row.className = 'srow';
+  row.innerHTML = `<input type="time" step="900" required>` +
+    `<input type="number" step="0.5" min="5" max="30" inputmode="decimal" required>` +
+    `<button aria-label="Изтрий периода">✕</button>`;
+  row.children[0].value = t;
+  row.children[1].value = v;
+  row.children[0].oninput = row.children[1].oninput = () => { schedDirty = true; $('schedMsg').textContent = ''; };
+  row.children[2].onclick = () => { row.remove(); schedDirty = true; };
+  $('schedRows').appendChild(row);
+}
+
+function loadSchedDay() {
+  $('schedRows').innerHTML = '';
+  if (!sched) { $('schedMsg').textContent = 'Графикът още не е получен от термостата…'; return; }
+  $('schedMsg').textContent = '';
+  for (const e of parseDay(sched[+$('schedDay').value])) addRow(e.t, e.v);
+  schedDirty = false;
+}
+
+$('schedDay').onchange = () => {
+  if (schedDirty && !confirm('Има незаписани промени. Да ги загубя ли?')) return;
+  loadSchedDay();
+};
+$('schedAdd').onclick = () => {
+  const rows = $('schedRows').children;
+  if (rows.length >= 8) { $('schedMsg').textContent = 'Най-много 8 периода на ден.'; return; }
+  const last = rows.length ? rows[rows.length - 1].children[0].value : '05:00';
+  const h = (parseInt(last, 10) + 1) % 24;
+  addRow(`${pad(h)}:00`, 21);
+  schedDirty = true;
+};
+$('schedSave').onclick = () => {
+  const items = [];
+  for (const r of $('schedRows').children) {
+    const t = r.children[0].value, v = parseFloat(r.children[1].value);
+    if (!t || isNaN(v) || v < 5 || v > 30) { $('schedMsg').textContent = 'Проверете часовете и температурите (5–30°).'; return; }
+    items.push({ t, v });
+  }
+  items.sort((a, b) => a.t.localeCompare(b.t));
+  const text = items.map((e) => `${e.t} ${e.v}`).join(', ');
+  cmd({ sched_text: { day: +$('schedDay').value, text } });
+  schedDirty = false;
+  $('schedMsg').textContent = 'Изпратено ✓';
+};
 
 // ---------- старт ----------
 (async () => {
