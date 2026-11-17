@@ -429,6 +429,9 @@ function render() {
   $('power').textContent = (p === null ? '--%' : Math.round(p) + '%') + (kw === null ? '' : `  ${kw.toFixed(1)} kW`);
   $('powerBar').style.width = (p || 0) + '%';
 
+  // „Крива“ само когато има външна температура (от котела или от Home Assistant)
+  $('selReg').options[2].disabled = num('out') === null;
+  $('selReg').options[2].textContent = num('out') === null ? 'Крива (няма външна темп.)' : 'Крива';
   if (st.reg && document.activeElement !== $('selReg')) $('selReg').value = st.reg;
   if (st.sched && document.activeElement !== $('selSched')) $('selSched').value = st.sched;
 
