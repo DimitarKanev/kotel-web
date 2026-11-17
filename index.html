@@ -196,6 +196,7 @@
       <span>Подаваща вода</span><span id="kvFlow">--</span>
       <span>Връщаща вода</span><span id="kvRet">--</span>
       <span>Налягане</span><span id="kvPress">--</span>
+      <span>Котел</span><span id="kvBoiler">--</span>
       <span>Връзка с котела</span><span id="kvLink">--</span>
       <span>Авария</span><span id="kvFault">--</span>
     </div>
@@ -407,7 +408,8 @@ function render() {
   $('outside').textContent = out === null ? 'няма' : f1(out);
 
   const chOn = st.ch === true, dhwOn = st.dhw_act === true, fault = st.fault === true;
-  $('boilerState').textContent = st.link === false ? 'Няма връзка с котела' : fault ? 'Авария'
+  $('boilerState').textContent = st.link === false ? 'Няма връзка с адаптера'
+    : st.boiler_ok === false ? 'Котелът не отговаря' : fault ? 'Авария'
     : chOn && dhwOn ? 'Отопление + БГВ' : dhwOn ? 'Топла вода' : chOn ? 'Отопление' : 'В покой';
   $('boilerState').className = fault ? 'fault' : 'label';
 
@@ -434,7 +436,8 @@ function render() {
   $('kvFlow').textContent = f1(num('flow'));
   $('kvRet').textContent = f1(num('ret'));
   $('kvPress').textContent = f1(num('press'), ' bar');
-  $('kvLink').textContent = st.link ? 'да' : 'няма';
+  $('kvBoiler').textContent = st.boiler || '--';
+  $('kvLink').textContent = !st.link ? 'няма адаптер' : st.boiler_ok === false ? 'котелът не отговаря' : 'да';
   const code = num('fault_code');
   $('kvFault').textContent = fault ? 'да' + (code !== null ? ` (E${Math.round(code)})` : '') : 'няма';
   $('kvFault').className = fault ? 'fault' : '';
