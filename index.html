@@ -7,6 +7,11 @@
 <title>Котел</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Котел">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
   :root {
     --bg: #101418; --card: #1e252c; --text: #e8eaed; --muted: #8a939c;
@@ -210,6 +215,9 @@
 <dialog id="dlgMenu">
   <div class="menu">
     <div class="label" id="menuWho"></div>
+    <button id="mInstall" class="hidden">📲 Инсталирай приложението</button>
+    <div class="note hidden" id="iosHint">За да го инсталирате на iPhone: бутон „Сподели“ (□↑) в Safari →
+      „Добави към началния екран“.</div>
     <button id="mAdd">➕ Добави термостат</button>
     <button id="mRemove">➖ Махни този термостат от акаунта</button>
     <button id="mLogout">↩ Изход</button>
@@ -533,6 +541,27 @@ $('schedSave').onclick = () => {
   schedDirty = false;
   $('schedMsg').textContent = 'Изпратено ✓';
 };
+
+// ---------- инсталиране като приложение (PWA) ----------
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {   // Android / Chrome / Edge
+  e.preventDefault();
+  installPrompt = e;
+  $('mInstall').classList.remove('hidden');
+});
+$('mInstall').onclick = async () => {
+  $('dlgMenu').close();
+  if (!installPrompt) return;
+  installPrompt.prompt();
+  await installPrompt.userChoice.catch(() => {});
+  installPrompt = null;
+  $('mInstall').classList.add('hidden');
+};
+const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !standalone) $('iosHint').classList.remove('hidden');
 
 // ---------- старт ----------
 (async () => {
