@@ -453,7 +453,7 @@ function render() {
   $('kvBoiler').textContent = st.boiler || '--';
   $('kvLink').textContent = !st.link ? 'няма адаптер' : st.boiler_ok === false ? 'котелът не отговаря' : 'да';
   const code = num('fault_code');
-  $('kvFault').textContent = fault ? 'да' + (code !== null ? ` (E${Math.round(code)})` : '') : 'няма';
+  $('kvFault').textContent = fault ? (st.fault_text || ('да' + (code !== null ? ` (E${Math.round(code)})` : ''))) : 'няма';
   $('kvFault').className = fault ? 'fault' : '';
 }
 
