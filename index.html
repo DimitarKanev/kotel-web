@@ -218,6 +218,8 @@
     <button id="mInstall" class="hidden">📲 Инсталирай приложението</button>
     <div class="note hidden" id="iosHint">За да го инсталирате на iPhone: бутон „Сподели“ (□↑) в Safari →
       „Добави към началния екран“.</div>
+    <button id="mPush">🔔 Включи известията</button>
+    <button id="mPushTest" class="hidden">🔔 Пробно известие</button>
     <button id="mAdd">➕ Добави термостат</button>
     <button id="mRemove">➖ Махни този термостат от акаунта</button>
     <button id="mLogout">↩ Изход</button>
@@ -562,6 +564,46 @@ $('mInstall').onclick = async () => {
 };
 const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !standalone) $('iosHint').classList.remove('hidden');
+
+// ---------- известия на телефона (Web Push) ----------
+const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+async function pushState() {
+  if (!pushSupported) {
+    $('mPush').textContent = /iphone|ipad|ipod/i.test(navigator.userAgent)
+      ? '🔔 Известия: първо добавете приложението към началния екран' : '🔔 Известията не се поддържат тук';
+    $('mPush').disabled = true;
+    return;
+  }
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  $('mPush').textContent = sub ? '🔕 Спри известията' : '🔔 Включи известията';
+  $('mPushTest').classList.toggle('hidden', !sub);
+}
+const urlKey = (b64) => {
+  const s = atob(b64.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((b64.length + 3) % 4));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+};
+$('mPush').onclick = async () => {
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const old = await reg.pushManager.getSubscription();
+    if (old) {
+      await api('/api/push/unsubscribe', { endpoint: old.endpoint }).catch(() => {});
+      await old.unsubscribe();
+    } else {
+      if (await Notification.requestPermission() !== 'granted') { alert('Известията са забранени в настройките на браузъра.'); return; }
+      const { key } = await api('/api/push/key');
+      const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlKey(key) });
+      await api('/api/push/subscribe', { subscription: sub.toJSON() });
+    }
+  } catch (err) { alert('Известия: ' + err.message); }
+  pushState();
+};
+$('mPushTest').onclick = async () => {
+  try { const r = await api('/api/push/test', {}); if (!r.sent) alert('Не се изпрати - опитайте да изключите и включите известията.'); }
+  catch (err) { alert(err.message); }
+};
+$('btnMenu').addEventListener('click', () => { pushState().catch(() => {}); });
 
 // ---------- старт ----------
 (async () => {

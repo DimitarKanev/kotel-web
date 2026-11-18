@@ -1,6 +1,6 @@
 // Service worker: приложението се отваря и без мрежа (показва последния вид),
 // а при мрежа винаги взима най-новата версия на страницата.
-const CACHE = 'kotel-v1';
+const CACHE = 'kotel-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   './apple-touch-icon.png', 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js'];
 
@@ -31,4 +31,26 @@ self.addEventListener('fetch', (e) => {
   }
   // Иконки, скриптове: първо от кеша
   e.respondWith(caches.match(req).then((hit) => hit || fetch(req)));
+});
+
+// --- Известия от облачната услуга (Web Push) ---
+self.addEventListener('push', (e) => {
+  let m = {};
+  try { m = e.data ? e.data.json() : {}; } catch { m = { title: 'Котел', body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(m.title || 'Котел', {
+    body: m.body || '',
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
+    tag: (m.device || 'kotel') + ':' + (m.title || ''),
+    renotify: true,
+    data: { url: './' },
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+    for (const c of list) if ('focus' in c) return c.focus();
+    return self.clients.openWindow('./');
+  }));
 });
