@@ -208,6 +208,11 @@
       <span>Връзка с котела</span><span id="kvLink">--</span>
       <span>Авария</span><span id="kvFault">--</span>
     </div>
+    <!-- Нулиране на авария (като бутона Reset на котела) -->
+    <div id="rstBox" class="stack hidden" style="margin-top:12px">
+      <button id="btnReset" class="on-heat">Нулиране (Reset)</button>
+      <div class="note" id="rstMsg"></div>
+    </div>
   </section>
 
   <p class="note"><span id="lastChange"></span><br>Промените тук се виждат веднага и на дисплея, и в Home Assistant.</p>
@@ -478,6 +483,14 @@ function render() {
     : fl ? `E${String(Math.round(code)).padStart(2, '0')} ${fl[LANG] || fl.bg}`
     : (st.fault_text || (t('да') + (code !== null ? ` (E${Math.round(code)})` : '')));
   $('kvFault').className = fault ? 'fault' : '';
+  // Нулиране: бутонът - само при авария; резултатът се вижда 2 минути (от дисплея)
+  const RST = { 9: 'Изпратено...', 10: 'Котелът е нулиран', 1: 'Котелът не поддържа нулиране отдалеч',
+    2: 'Котелът отказа нулирането', 3: 'Няма отговор от котела', 4: 'Твърде много нулирания - изчакайте час',
+    5: 'Няма авария за нулиране' };
+  const rst = num('rst');
+  $('rstBox').classList.toggle('hidden', !fault && !(rst && RST[rst]));
+  $('btnReset').classList.toggle('hidden', !fault);
+  $('rstMsg').textContent = rst && RST[rst] ? t(RST[rst]) : t('Нулирането е като бутона Reset на котела.');
 }
 
 document.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => {
@@ -499,6 +512,10 @@ $('btnHeat').addEventListener('click', () => { st.mode = st.mode === 'off' ? 'he
 $('btnSummer').addEventListener('click', () => {
   if (!st.summer && !confirm(t('Летен режим: отоплението спира, работи само топлата вода. Включване?'))) return;
   st.summer = !st.summer; render(); cmd({ summer: st.summer });
+});
+$('btnReset').addEventListener('click', () => {
+  if (!confirm(t('Да нулирам ли аварията на котела? Ако се повтаря, потърсете сервиз.'))) return;
+  st.rst = 9; render(); cmd({ reset: true });
 });
 $('btnDhw').addEventListener('click', () => { st.dhw_on = !st.dhw_on; render(); cmd({ dhw_on: st.dhw_on }); });
 $('selReg').addEventListener('change', (e) => { st.reg = e.target.value; cmd({ reg: st.reg }); e.target.blur(); });

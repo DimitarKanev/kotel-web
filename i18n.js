@@ -125,6 +125,20 @@
     'Известията са забранени в настройките на браузъра.': ['Notifications are blocked in the browser settings.', 'Le notifiche sono bloccate nelle impostazioni del browser.', 'Benachrichtigungen sind in den Browsereinstellungen blockiert.'],
     'Известия': ['Notifications', 'Notifiche', 'Benachrichtigungen'],
     'Не се изпрати - опитайте да изключите и включите известията.': ['Not sent - try turning notifications off and on.', 'Non inviata - prova a disattivare e riattivare le notifiche.', 'Nicht gesendet - Benachrichtigungen aus- und wieder einschalten.'],
+    // нулиране на авария
+    'Нулиране (Reset)': ['Reset', 'Reset', 'Reset'],
+    'Да нулирам ли аварията на котела? Ако се повтаря, потърсете сервиз.':
+      ['Reset the boiler fault? If it keeps coming back, call a service technician.',
+       'Ripristinare il guasto della caldaia? Se si ripete, chiama l\'assistenza.',
+       'Kesselstörung zurücksetzen? Wenn sie wiederkehrt, den Service rufen.'],
+    'Изпратено...': ['Sent...', 'Inviato...', 'Gesendet...'],
+    'Котелът е нулиран': ['Boiler has been reset', 'Caldaia ripristinata', 'Kessel zurückgesetzt'],
+    'Котелът не поддържа нулиране отдалеч': ['Boiler does not support remote reset', 'La caldaia non supporta il reset remoto', 'Kessel unterstützt keinen Fern-Reset'],
+    'Котелът отказа нулирането': ['Boiler refused the reset', 'La caldaia ha rifiutato il reset', 'Kessel hat den Reset abgelehnt'],
+    'Няма отговор от котела': ['No answer from the boiler', 'Nessuna risposta dalla caldaia', 'Keine Antwort vom Kessel'],
+    'Твърде много нулирания - изчакайте час': ['Too many resets - wait an hour', 'Troppi reset - attendi un\'ora', 'Zu viele Resets - eine Stunde warten'],
+    'Няма авария за нулиране': ['No fault to reset', 'Nessun guasto da ripristinare', 'Keine Störung zum Zurücksetzen'],
+    'Нулирането е като бутона Reset на котела.': ['The reset works like the boiler\'s Reset button.', 'Il reset funziona come il tasto Reset della caldaia.', 'Der Reset wirkt wie die Reset-Taste am Kessel.'],
     // източници на последната промяна (от дисплея)
     'дисплей': ['display', 'display', 'Display'],
     'телефон': ['phone', 'telefono', 'Handy'],
