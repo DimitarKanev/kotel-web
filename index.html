@@ -218,6 +218,7 @@
     <button id="mInstall" class="hidden">📲 Инсталирай приложението</button>
     <div class="note hidden" id="iosHint">За да го инсталирате на iPhone: бутон „Сподели“ (□↑) в Safari →
       „Добави към началния екран“.</div>
+    <button id="mLock">🔒 Заключи дисплея</button>
     <button id="mPush">🔔 Включи известията</button>
     <button id="mPushTest" class="hidden">🔔 Пробно известие</button>
     <button id="mAdd">➕ Добави термостат</button>
@@ -604,6 +605,11 @@ $('mPushTest').onclick = async () => {
   catch (err) { alert(err.message); }
 };
 $('btnMenu').addEventListener('click', () => { pushState().catch(() => {}); });
+// Защита от деца на дисплея
+$('btnMenu').addEventListener('click', () => {
+  $('mLock').textContent = st.lock ? '🔓 Отключи дисплея' : '🔒 Заключи дисплея (защита от деца)';
+});
+$('mLock').onclick = () => { $('dlgMenu').close(); st.lock = !st.lock; cmd({ lock: st.lock }); };
 
 // ---------- старт ----------
 (async () => {
