@@ -466,7 +466,9 @@ function render() {
   $('kvFlow').textContent = f1(num('flow'));
   $('kvRet').textContent = f1(num('ret'));
   $('kvPress').textContent = f1(num('press'), ' bar');
-  $('kvBoiler').textContent = st.boiler || '--';
+  // Състоянието се превежда тук (дисплеят пише на своя език); иначе - производител/тип от дисплея
+  $('kvBoiler').textContent = st.link === false ? t('няма адаптер')
+    : st.boiler_ok === false ? t('котелът не отговаря') : (st.boiler || '--');
   $('kvLink').textContent = t(!st.link ? 'няма адаптер' : st.boiler_ok === false ? 'котелът не отговаря' : 'да');
   const code = num('fault_code');
   // Текстът на грешката - на езика на приложението (по номера), иначе този от дисплея
