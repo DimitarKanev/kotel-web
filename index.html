@@ -79,6 +79,7 @@
   <header>
     <h1>Котел</h1>
     <div class="status"><span id="dot" class="dot"></span><span id="conn"></span>
+      <button id="btnLang" aria-label="Език / Language">🌐</button>
       <button id="btnMenu" aria-label="Меню" class="hidden">☰</button></div>
   </header>
 
@@ -167,10 +168,10 @@
 
   <section class="card grid2">
     <label><span class="label">Регулиране</span>
-      <select id="selReg"><option>Стаен термостат</option><option>Фиксирана</option><option>Крива</option></select>
+      <select id="selReg"><option value="Стаен термостат">Стаен термостат</option><option value="Фиксирана">Фиксирана</option><option value="Крива">Крива</option></select>
     </label>
     <label><span class="label">График</span>
-      <select id="selSched"><option>Изкл</option><option>Дневен</option><option>Седмичен</option></select>
+      <select id="selSched"><option value="Изкл">Изкл</option><option value="Дневен">Дневен</option><option value="Седмичен">Седмичен</option></select>
     </label>
   </section>
 
@@ -212,6 +213,10 @@
   </div>
 </main>
 
+<dialog id="dlgLang">
+  <div class="menu" id="langList"></div>
+</dialog>
+
 <dialog id="dlgMenu">
   <div class="menu">
     <div class="label" id="menuWho"></div>
@@ -229,7 +234,15 @@
 </dialog>
 
 <script src="https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<script src="i18n.js"></script>
+<script src="faults.js"></script>
 <script>
+// ---------- език ----------
+const { t, trLast, LANG } = window.I18N;
+document.documentElement.lang = LANG;
+document.title = t('Котел');
+I18N.applyDom(document.body);
+
 // Облачната услуга (акаунти и сдвояване) - cloud/src/index.js
 const API = 'https://kotel-cloud.dimitarkanev55.workers.dev';
 const $ = (id) => document.getElementById(id);
@@ -253,10 +266,10 @@ async function api(path, body) {
   try {
     r = await fetch(API + path, { method: body === undefined ? 'GET' : 'POST', headers: h,
       body: body === undefined ? undefined : JSON.stringify(body) });
-  } catch { throw new Error('Няма връзка с интернет'); }
+  } catch { throw new Error(t('Няма връзка с интернет')); }
   const d = await r.json().catch(() => ({}));
   if (r.status === 401 && path !== '/api/login') store.set('kotel_token', null);
-  if (!r.ok) { const e = new Error(d.error || 'Грешка ' + r.status); e.status = r.status; throw e; }
+  if (!r.ok) { const e = new Error(t(d.error || '') || t('Грешка') + ' ' + r.status); e.status = r.status; throw e; }
   return d;
 }
 
@@ -276,9 +289,9 @@ function setRegMode(on) {
   regMode = on;
   $('tabLogin').classList.toggle('on', !on);
   $('tabReg').classList.toggle('on', on);
-  $('btnAuth').textContent = on ? 'Регистрация' : 'Вход';
+  $('btnAuth').textContent = t(on ? 'Регистрация' : 'Вход');
   $('password').autocomplete = on ? 'new-password' : 'current-password';
-  $('authNote').textContent = on ? 'Вече имате акаунт? Изберете „Вход“.' : 'Нямате акаунт? Изберете „Регистрация“.';
+  $('authNote').textContent = t(on ? 'Вече имате акаунт? Изберете „Вход“.' : 'Нямате акаунт? Изберете „Регистрация“.');
   $('authErr').textContent = '';
 }
 $('tabLogin').onclick = () => setRegMode(false);
@@ -336,7 +349,7 @@ $('mClose').onclick = () => $('dlgMenu').close();
 $('mAdd').onclick = () => { $('dlgMenu').close(); openPair(true); };
 $('mRemove').onclick = async () => {
   $('dlgMenu').close();
-  if (!dev || !confirm('Да махна ли този термостат от вашия акаунт? Самият термостат продължава да работи.')) return;
+  if (!dev || !confirm(t('Да махна ли този термостат от вашия акаунт? Самият термостат продължава да работи.'))) return;
   try { me = await api('/api/unpair', { device: dev }); dev = null; afterLogin(me); } catch (err) { alert(err.message); }
 };
 $('mLogout').onclick = async () => {
@@ -359,7 +372,7 @@ function startDevice() {
   me.devices.forEach((d, i) => {
     const o = document.createElement('option');
     o.value = d;
-    o.textContent = 'Термостат ' + (i + 1) + ' (' + d + ')';
+    o.textContent = t('Термостат') + ' ' + (i + 1) + ' (' + d + ')';
     sel.appendChild(o);
   });
   sel.value = dev;
@@ -374,7 +387,7 @@ function startDevice() {
 const T = (x) => `k/${dev}/${x}`;
 function connect() {
   if (client) client.end(true);
-  setConn('Свързване…');
+  setConn(t('Свързване…'));
   const m = me.mqtt;
   const my = mqtt.connect(`wss://${m.host}:${m.port}/mqtt`, {
     username: m.user, password: m.pass,
@@ -383,10 +396,10 @@ function connect() {
   });
   client = my;
   // Само два абонамента (EMQX Serverless позволява до 10 на клиент)
-  my.on('connect', () => { setConn('Свързано', 'ok'); my.subscribe([T('state'), T('status'), T('sched')]); });
-  my.on('reconnect', () => { if (my === client) setConn('Свързване…'); });
-  my.on('close', () => { if (my === client) setConn('Няма връзка', 'bad'); });
-  my.on('error', (e) => { if (my === client) setConn('Грешка: ' + (e && e.message || e), 'bad'); });
+  my.on('connect', () => { setConn(t('Свързано'), 'ok'); my.subscribe([T('state'), T('status'), T('sched')]); });
+  my.on('reconnect', () => { if (my === client) setConn(t('Свързване…')); });
+  my.on('close', () => { if (my === client) setConn(t('Няма връзка'), 'bad'); });
+  my.on('error', (e) => { if (my === client) setConn(t('Грешка') + ': ' + (e && e.message || e), 'bad'); });
   my.on('message', (topic, msg) => {
     if (my !== client) return;
     if (topic === T('status')) st.status = msg.toString();
@@ -410,31 +423,31 @@ const f1 = (v, u = '°') => v === null ? '--' : v.toFixed(1) + u;
 const f0 = (v, u = '') => v === null ? '--' : Math.round(v) + u;
 
 function render() {
-  if (st.status === 'offline') setConn('Термостатът е офлайн', 'bad');
-  else if (client && client.connected) setConn('Свързано', 'ok');
+  if (st.status === 'offline') setConn(t('Термостатът е офлайн'), 'bad');
+  else if (client && client.connected) setConn(t('Свързано'), 'ok');
 
   $('room').textContent = f1(num('room'));
   const h = num('hum');
-  $('humidity').textContent = 'влажност ' + (h === null ? '--' : Math.round(h)) + '%';
+  $('humidity').textContent = t('влажност') + ' ' + (h === null ? '--' : Math.round(h)) + '%';
   const out = num('out');
-  $('outside').textContent = out === null ? 'няма' : f1(out);
+  $('outside').textContent = out === null ? t('няма') : f1(out);
 
   const chOn = st.ch === true, dhwOn = st.dhw_act === true, fault = st.fault === true;
-  $('boilerState').textContent = st.link === false ? 'Няма връзка с адаптера'
+  $('boilerState').textContent = t(st.link === false ? 'Няма връзка с адаптера'
     : st.boiler_ok === false ? 'Котелът не отговаря' : fault ? 'Авария'
-    : chOn && dhwOn ? 'Отопление + БГВ' : dhwOn ? 'Топла вода' : chOn ? 'Отопление' : 'В покой';
+    : chOn && dhwOn ? 'Отопление + БГВ' : dhwOn ? 'Топла вода' : chOn ? 'Отопление' : 'В покой');
   $('boilerState').className = fault ? 'fault' : 'label';
 
-  $('target').textContent = 'Цел ' + f1(num('target'));
-  $('btnHeat').textContent = st.mode === 'off' ? 'Отопление: изкл' : 'Отопление: вкл';
-  $('btnSummer').textContent = st.summer ? 'Летен режим: вкл' : 'Летен режим';
+  $('target').textContent = t('Цел') + ' ' + f1(num('target'));
+  $('btnHeat').textContent = t(st.mode === 'off' ? 'Отопление: изкл' : 'Отопление: вкл');
+  $('btnSummer').textContent = t(st.summer ? 'Летен режим: вкл' : 'Летен режим');
   $('btnSummer').className = st.summer ? 'on-water' : '';
   $('btnHeat').className = st.mode === 'heat' ? 'on-heat' : '';
   const req = num('flow_req');
-  $('flow').textContent = `Вода ${f0(num('flow'))} / ${req && req > 0 ? f0(req) : '--'}°`;
+  $('flow').textContent = `${t('Вода')} ${f0(num('flow'))} / ${req && req > 0 ? f0(req) : '--'}°`;
   $('cardHeat').classList.toggle('active-heat', chOn);
 
-  $('btnDhw').textContent = st.dhw_on ? 'Топла вода: вкл' : 'Топла вода: изкл';
+  $('btnDhw').textContent = t(st.dhw_on ? 'Топла вода: вкл' : 'Топла вода: изкл');
   $('btnDhw').className = st.dhw_on ? 'on-water' : '';
   $('dhw').textContent = `${f0(num('dhw_t'))} / ${f0(num('dhw_set'))}°`;
   $('cardDhw').classList.toggle('active-water', dhwOn);
@@ -445,18 +458,22 @@ function render() {
 
   // „Крива“ само когато има външна температура (от котела или от Home Assistant)
   $('selReg').options[2].disabled = num('out') === null;
-  $('selReg').options[2].textContent = num('out') === null ? 'Крива (няма външна темп.)' : 'Крива';
+  $('selReg').options[2].textContent = t(num('out') === null ? 'Крива (няма външна темп.)' : 'Крива');
   if (st.reg && document.activeElement !== $('selReg')) $('selReg').value = st.reg;
   if (st.sched && document.activeElement !== $('selSched')) $('selSched').value = st.sched;
 
-  $('lastChange').textContent = st.last ? 'Последна промяна: ' + st.last : '';
+  $('lastChange').textContent = st.last ? t('Последна промяна:') + ' ' + trLast(st.last) : '';
   $('kvFlow').textContent = f1(num('flow'));
   $('kvRet').textContent = f1(num('ret'));
   $('kvPress').textContent = f1(num('press'), ' bar');
   $('kvBoiler').textContent = st.boiler || '--';
-  $('kvLink').textContent = !st.link ? 'няма адаптер' : st.boiler_ok === false ? 'котелът не отговаря' : 'да';
+  $('kvLink').textContent = t(!st.link ? 'няма адаптер' : st.boiler_ok === false ? 'котелът не отговаря' : 'да');
   const code = num('fault_code');
-  $('kvFault').textContent = fault ? (st.fault_text || ('да' + (code !== null ? ` (E${Math.round(code)})` : ''))) : 'няма';
+  // Текстът на грешката - на езика на приложението (по номера), иначе този от дисплея
+  const fl = code !== null && window.FAULTS && FAULTS[String(Math.round(code))];
+  $('kvFault').textContent = !fault ? t('няма')
+    : fl ? `E${String(Math.round(code)).padStart(2, '0')} ${fl[LANG] || fl.bg}`
+    : (st.fault_text || (t('да') + (code !== null ? ` (E${Math.round(code)})` : '')));
   $('kvFault').className = fault ? 'fault' : '';
 }
 
@@ -477,7 +494,7 @@ document.querySelectorAll('[data-dhw]').forEach((b) => b.addEventListener('click
 // Бутоните се сменят веднага; дисплеят потвърждава до около секунда
 $('btnHeat').addEventListener('click', () => { st.mode = st.mode === 'off' ? 'heat' : 'off'; render(); cmd({ mode: st.mode }); });
 $('btnSummer').addEventListener('click', () => {
-  if (!st.summer && !confirm('Летен режим: отоплението спира, работи само топлата вода. Включване?')) return;
+  if (!st.summer && !confirm(t('Летен режим: отоплението спира, работи само топлата вода. Включване?'))) return;
   st.summer = !st.summer; render(); cmd({ summer: st.summer });
 });
 $('btnDhw').addEventListener('click', () => { st.dhw_on = !st.dhw_on; render(); cmd({ dhw_on: st.dhw_on }); });
@@ -503,7 +520,7 @@ function addRow(t, v) {
   row.className = 'srow';
   row.innerHTML = `<input type="time" step="900" required>` +
     `<input type="number" step="0.5" min="5" max="30" inputmode="decimal" required>` +
-    `<button aria-label="Изтрий периода">✕</button>`;
+    `<button aria-label="${t('Изтрий периода')}">✕</button>`;
   row.children[0].value = t;
   row.children[1].value = v;
   row.children[0].oninput = row.children[1].oninput = () => { schedDirty = true; $('schedMsg').textContent = ''; };
@@ -513,19 +530,19 @@ function addRow(t, v) {
 
 function loadSchedDay() {
   $('schedRows').innerHTML = '';
-  if (!sched) { $('schedMsg').textContent = 'Графикът още не е получен от термостата…'; return; }
+  if (!sched) { $('schedMsg').textContent = t('Графикът още не е получен от термостата…'); return; }
   $('schedMsg').textContent = '';
   for (const e of parseDay(sched[+$('schedDay').value])) addRow(e.t, e.v);
   schedDirty = false;
 }
 
 $('schedDay').onchange = () => {
-  if (schedDirty && !confirm('Има незаписани промени. Да ги загубя ли?')) return;
+  if (schedDirty && !confirm(t('Има незаписани промени. Да ги загубя ли?'))) return;
   loadSchedDay();
 };
 $('schedAdd').onclick = () => {
   const rows = $('schedRows').children;
-  if (rows.length >= 8) { $('schedMsg').textContent = 'Най-много 8 периода на ден.'; return; }
+  if (rows.length >= 8) { $('schedMsg').textContent = t('Най-много 8 периода на ден.'); return; }
   const last = rows.length ? rows[rows.length - 1].children[0].value : '05:00';
   const h = (parseInt(last, 10) + 1) % 24;
   addRow(`${pad(h)}:00`, 21);
@@ -535,14 +552,14 @@ $('schedSave').onclick = () => {
   const items = [];
   for (const r of $('schedRows').children) {
     const t = r.children[0].value, v = parseFloat(r.children[1].value);
-    if (!t || isNaN(v) || v < 5 || v > 30) { $('schedMsg').textContent = 'Проверете часовете и температурите (5–30°).'; return; }
+    if (!t || isNaN(v) || v < 5 || v > 30) { $('schedMsg').textContent = t('Проверете часовете и температурите (5–30°).'); return; }
     items.push({ t, v });
   }
   items.sort((a, b) => a.t.localeCompare(b.t));
   const text = items.map((e) => `${e.t} ${e.v}`).join(', ');
   cmd({ sched_text: { day: +$('schedDay').value, text } });
   schedDirty = false;
-  $('schedMsg').textContent = 'Изпратено ✓';
+  $('schedMsg').textContent = t('Изпратено ✓');
 };
 
 // ---------- инсталиране като приложение (PWA) ----------
@@ -570,14 +587,14 @@ if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !standalone) $('iosHint').c
 const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 async function pushState() {
   if (!pushSupported) {
-    $('mPush').textContent = /iphone|ipad|ipod/i.test(navigator.userAgent)
-      ? '🔔 Известия: първо добавете приложението към началния екран' : '🔔 Известията не се поддържат тук';
+    $('mPush').textContent = t(/iphone|ipad|ipod/i.test(navigator.userAgent)
+      ? '🔔 Известия: първо добавете приложението към началния екран' : '🔔 Известията не се поддържат тук');
     $('mPush').disabled = true;
     return;
   }
   const reg = await navigator.serviceWorker.ready;
   const sub = await reg.pushManager.getSubscription();
-  $('mPush').textContent = sub ? '🔕 Спри известията' : '🔔 Включи известията';
+  $('mPush').textContent = t(sub ? '🔕 Спри известията' : '🔔 Включи известията');
   $('mPushTest').classList.toggle('hidden', !sub);
 }
 const urlKey = (b64) => {
@@ -592,24 +609,46 @@ $('mPush').onclick = async () => {
       await api('/api/push/unsubscribe', { endpoint: old.endpoint }).catch(() => {});
       await old.unsubscribe();
     } else {
-      if (await Notification.requestPermission() !== 'granted') { alert('Известията са забранени в настройките на браузъра.'); return; }
+      if (await Notification.requestPermission() !== 'granted') { alert(t('Известията са забранени в настройките на браузъра.')); return; }
       const { key } = await api('/api/push/key');
       const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlKey(key) });
-      await api('/api/push/subscribe', { subscription: sub.toJSON() });
+      await api('/api/push/subscribe', { subscription: sub.toJSON(), lang: LANG });
     }
-  } catch (err) { alert('Известия: ' + err.message); }
+  } catch (err) { alert(t('Известия') + ': ' + err.message); }
   pushState();
 };
 $('mPushTest').onclick = async () => {
-  try { const r = await api('/api/push/test', {}); if (!r.sent) alert('Не се изпрати - опитайте да изключите и включите известията.'); }
+  try { const r = await api('/api/push/test', {}); if (!r.sent) alert(t('Не се изпрати - опитайте да изключите и включите известията.')); }
   catch (err) { alert(err.message); }
 };
 $('btnMenu').addEventListener('click', () => { pushState().catch(() => {}); });
 // Защита от деца на дисплея
 $('btnMenu').addEventListener('click', () => {
-  $('mLock').textContent = st.lock ? '🔓 Отключи дисплея' : '🔒 Заключи дисплея (защита от деца)';
+  $('mLock').textContent = t(st.lock ? '🔓 Отключи дисплея' : '🔒 Заключи дисплея (защита от деца)');
 });
 $('mLock').onclick = () => { $('dlgMenu').close(); st.lock = !st.lock; cmd({ lock: st.lock }); };
+
+// ---------- избор на език ----------
+for (const l of I18N.LANGS) {
+  const b = document.createElement('button');
+  b.textContent = (l === LANG ? '✓ ' : '') + I18N.NAMES[l];
+  b.onclick = async () => {
+    $('dlgLang').close();
+    if (l === LANG) return;
+    I18N.setLang(l);
+    // Известията също минават на новия език (облакът пази езика към абонамента)
+    try {
+      if (pushSupported && store.get('kotel_token')) {
+        const sub = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+        if (sub) await api('/api/push/subscribe', { subscription: sub.toJSON(), lang: l });
+      }
+    } catch {}
+    location.reload();
+  };
+  $('langList').appendChild(b);
+}
+$('btnLang').onclick = () => $('dlgLang').showModal();
+$('dlgLang').addEventListener('click', (e) => { if (e.target === $('dlgLang')) $('dlgLang').close(); });
 
 // ---------- старт ----------
 (async () => {

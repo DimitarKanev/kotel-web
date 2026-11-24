@@ -1,8 +1,8 @@
 // Service worker: приложението се отваря и без мрежа (показва последния вид),
 // а при мрежа винаги взима най-новата версия на страницата.
-const CACHE = 'kotel-v2';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
-  './apple-touch-icon.png', 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js'];
+const CACHE = 'kotel-v3';
+const SHELL = ['./', './index.html', './i18n.js', './faults.js', './manifest.webmanifest', './icon-192.png',
+  './icon-512.png', './apple-touch-icon.png', 'https://unpkg.com/mqtt@5.10.1/dist/mqtt.min.js'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
@@ -29,7 +29,16 @@ self.addEventListener('fetch', (e) => {
     }).catch(() => caches.match('./index.html')));
     return;
   }
-  // Иконки, скриптове: първо от кеша
+  // Нашите скриптове (преводи, кодове за грешка): първо от мрежата, за да идват промените
+  if (url.origin === self.location.origin && url.pathname.endsWith('.js')) {
+    e.respondWith(fetch(req).then((r) => {
+      const copy = r.clone();
+      caches.open(CACHE).then((c) => c.put(req, copy));
+      return r;
+    }).catch(() => caches.match(req)));
+    return;
+  }
+  // Иконки, външната библиотека: първо от кеша
   e.respondWith(caches.match(req).then((hit) => hit || fetch(req)));
 });
 
