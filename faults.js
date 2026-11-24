@@ -20,10 +20,10 @@ window.FAULTS = {
   "de": "Abgasthermostat"
  },
  "4": {
-  "bg": "Предпазен термостат - сервиз",
-  "en": "Safety thermostat - service",
-  "it": "Termostato di sicurezza - assistenza",
-  "de": "Sicherheitsthermostat - Service"
+  "bg": "Блокировка - потърсете сервиз",
+  "en": "Lockout - call service",
+  "it": "Blocco - chiama l'assistenza",
+  "de": "Sperre - Service rufen"
  },
  "5": {
   "bg": "Датчик на подаващата вода",
@@ -229,6 +229,18 @@ window.FAULTS = {
   "it": "Calibrazione rapida necessaria",
   "de": "Schnellkalibrierung nötig"
  },
+ "73": {
+  "bg": "Отклонение на датчиците на подаващата",
+  "en": "Flow sensors deviation",
+  "it": "Deviazione sonde mandata",
+  "de": "Abweichung Vorlauffühler"
+ },
+ "74": {
+  "bg": "Повреда на предпазния датчик",
+  "en": "Safety sensor fault",
+  "it": "Guasto sonda di sicurezza",
+  "de": "Sicherheitsfühler defekt"
+ },
  "75": {
   "bg": "Повреда датчик подаваща/връщаща",
   "en": "Flow/return sensor fault",
@@ -260,10 +272,10 @@ window.FAULTS = {
   "de": "Problem Verbrennungsregelung"
  },
  "80": {
-  "bg": "Блокировка - управление газов клапан",
-  "en": "Lockout - gas valve control",
-  "it": "Blocco - comando valvola gas",
-  "de": "Sperre - Gasventilsteuerung"
+  "bg": "Блокировка - платка / газов клапан",
+  "en": "Lockout - control board / gas valve",
+  "it": "Blocco - scheda / valvola gas",
+  "de": "Sperre - Platine / Gasventil"
  },
  "83": {
   "bg": "Котелът е в режим ИЗКЛ",
@@ -348,6 +360,12 @@ window.FAULTS = {
   "en": "Lockout - software errors",
   "it": "Blocco - errori software",
   "de": "Sperre - Softwarefehler"
+ },
+ "99": {
+  "bg": "Обща блокировка",
+  "en": "General lockout",
+  "it": "Blocco generale",
+  "de": "Allgemeine Sperre"
  },
  "138": {
   "bg": "Подсушаване на замазка",
