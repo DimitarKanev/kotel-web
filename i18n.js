@@ -125,6 +125,14 @@
     'Известията са забранени в настройките на браузъра.': ['Notifications are blocked in the browser settings.', 'Le notifiche sono bloccate nelle impostazioni del browser.', 'Benachrichtigungen sind in den Browsereinstellungen blockiert.'],
     'Известия': ['Notifications', 'Notifiche', 'Benachrichtigungen'],
     'Не се изпрати - опитайте да изключите и включите известията.': ['Not sent - try turning notifications off and on.', 'Non inviata - prova a disattivare e riattivare le notifiche.', 'Nicht gesendet - Benachrichtigungen aus- und wieder einschalten.'],
+    // Комфорт / Икономия, сервиз
+    'Комфорт': ['Comfort', 'Comfort', 'Komfort'],
+    'Икономия': ['Economy', 'Economia', 'Spar'],
+    'Комфорт (K)': ['Comfort (K)', 'Comfort (K)', 'Komfort (K)'],
+    'Икономия (E)': ['Economy (E)', 'Economia (E)', 'Spar (E)'],
+    'Сервизен преглед': ['Service', 'Manutenzione', 'Wartung'],
+    'Време за сервиз': ['Service due', 'Manutenzione dovuta', 'Wartung fällig'],
+    'изключено': ['off', 'disattivato', 'aus'],
     // отсъствие
     '🧳 Отсъствие': ['🧳 Away', '🧳 Assenza', '🧳 Abwesenheit'],
     'Отсъствие': ['Away', 'Assenza', 'Abwesenheit'],
