@@ -125,6 +125,14 @@
     'Известията са забранени в настройките на браузъра.': ['Notifications are blocked in the browser settings.', 'Le notifiche sono bloccate nelle impostazioni del browser.', 'Benachrichtigungen sind in den Browsereinstellungen blockiert.'],
     'Известия': ['Notifications', 'Notifiche', 'Benachrichtigungen'],
     'Не се изпрати - опитайте да изключите и включите известията.': ['Not sent - try turning notifications off and on.', 'Non inviata - prova a disattivare e riattivare le notifiche.', 'Nicht gesendet - Benachrichtigungen aus- und wieder einschalten.'],
+    // отсъствие
+    '🧳 Отсъствие': ['🧳 Away', '🧳 Assenza', '🧳 Abwesenheit'],
+    'Отсъствие': ['Away', 'Assenza', 'Abwesenheit'],
+    'Отсъствие: вкл': ['Away: on', 'Assenza: attiva', 'Abwesenheit: ein'],
+    'до': ['until', 'fino al', 'bis'],
+    'Да спра ли отсъствието? Графикът продължава веднага.': ['Stop away mode? The schedule resumes at once.', 'Interrompere l\'assenza? Il programma riprende subito.', 'Abwesenheit beenden? Der Zeitplan läuft sofort weiter.'],
+    'След колко дни се връщате? (1-90)': ['In how many days are you back? (1-90)', 'Tra quanti giorni rientri? (1-90)', 'In wie vielen Tagen sind Sie zurück? (1-90)'],
+    'Температура докато ви няма (5-16°)': ['Temperature while away (5-16°)', 'Temperatura durante l\'assenza (5-16°)', 'Temperatur während Abwesenheit (5-16°)'],
     // нулиране на авария
     'Нулиране (Reset)': ['Reset', 'Reset', 'Reset'],
     'Да нулирам ли аварията на котела? Ако се повтаря, потърсете сервиз.':

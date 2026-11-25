@@ -145,6 +145,11 @@
       <button id="btnSummer">Летен режим</button>
       <div class="label" id="flow">Вода -- / --°</div>
     </div>
+    <!-- Отсъствие (ваканция): ниска температура до деня на връщане -->
+    <div class="row" style="margin-top:8px">
+      <button id="btnAway">🧳 Отсъствие</button>
+      <div class="label" id="awayInfo"></div>
+    </div>
   </section>
 
   <section class="card" id="cardDhw">
@@ -452,6 +457,18 @@ function render() {
   const req = num('flow_req');
   $('flow').textContent = `${t('Вода')} ${f0(num('flow'))} / ${req && req > 0 ? f0(req) : '--'}°`;
   $('cardHeat').classList.toggle('active-heat', chOn);
+  const away = num('away');
+  if (away && away > 0) {
+    const d = new Date(away * 1000);
+    $('btnAway').textContent = '🧳 ' + t('Отсъствие: вкл');
+    $('btnAway').className = 'on-water';
+    $('awayInfo').textContent = t('до') + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1) +
+      (num('away_t') !== null ? ` · ${num('away_t').toFixed(1)}°` : '');
+  } else {
+    $('btnAway').textContent = '🧳 ' + t('Отсъствие');
+    $('btnAway').className = '';
+    $('awayInfo').textContent = '';
+  }
 
   $('btnDhw').textContent = t(st.dhw_on ? 'Топла вода: вкл' : 'Топла вода: изкл');
   $('btnDhw').className = st.dhw_on ? 'on-water' : '';
@@ -512,6 +529,17 @@ $('btnHeat').addEventListener('click', () => { st.mode = st.mode === 'off' ? 'he
 $('btnSummer').addEventListener('click', () => {
   if (!st.summer && !confirm(t('Летен режим: отоплението спира, работи само топлата вода. Включване?'))) return;
   st.summer = !st.summer; render(); cmd({ summer: st.summer });
+});
+$('btnAway').addEventListener('click', () => {
+  if (num('away') > 0) {
+    if (confirm(t('Да спра ли отсъствието? Графикът продължава веднага.'))) { st.away = 0; render(); cmd({ away: false }); }
+    return;
+  }
+  const days = parseInt(prompt(t('След колко дни се връщате? (1-90)'), '7'), 10);
+  if (!(days >= 1 && days <= 90)) return;
+  const temp = parseFloat(String(prompt(t('Температура докато ви няма (5-16°)'), String(num('away_t') ?? 10))).replace(',', '.'));
+  if (!(temp >= 5 && temp <= 16)) return;
+  cmd({ away_temp: temp, away_days: days });
 });
 $('btnReset').addEventListener('click', () => {
   if (!confirm(t('Да нулирам ли аварията на котела? Ако се повтаря, потърсете сервиз.'))) return;
